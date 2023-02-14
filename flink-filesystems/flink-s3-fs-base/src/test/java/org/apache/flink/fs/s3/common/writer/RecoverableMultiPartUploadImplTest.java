@@ -25,12 +25,18 @@ import org.apache.flink.util.MathUtils;
 
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.hamcrest.Description;
+import org.hamcrest.TypeSafeMatcher;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+import software.amazon.awssdk.services.s3.model.Part;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -168,8 +174,8 @@ class RecoverableMultiPartUploadImplTest {
         assertThat(actualRecoverable.incompleteObjectLength())
                 .isEqualTo(expectedRecoverable.incompleteObjectLength());
 
-        assertThat(actualRecoverable.parts().stream().map(PartETag::getETag).toArray())
-                .isEqualTo(expectedRecoverable.parts().stream().map(PartETag::getETag).toArray());
+        assertThat(actualRecoverable.parts().stream().map(Part::eTag).toArray())
+                .isEqualTo(expectedRecoverable.parts().stream().map(Part::eTag).toArray());
     }
 
     // ---------------------------------- Test Methods -------------------------------------------
@@ -180,12 +186,16 @@ class RecoverableMultiPartUploadImplTest {
 
     private static S3Recoverable createS3Recoverable(
             byte[] incompletePart, byte[]... completeParts) {
-        final List<PartETag> eTags = new ArrayList<>();
+        final List<Part> eTags = new ArrayList<>();
 
         int index = 1;
         long bytesInPart = 0L;
         for (byte[] part : completeParts) {
-            eTags.add(new PartETag(index, createETag(TEST_OBJECT_NAME, index)));
+            eTags.add(
+                    Part.builder()
+                            .partNumber(index)
+                            .eTag(createETag(TEST_OBJECT_NAME, index))
+                            .build());
             bytesInPart += part.length;
             index++;
         }
@@ -326,7 +336,7 @@ class RecoverableMultiPartUploadImplTest {
         public CompleteMultipartUploadResult commitMultiPartUpload(
                 String key,
                 String uploadId,
-                List<PartETag> partETags,
+                List<Part> partETags,
                 long length,
                 AtomicInteger errorCount)
                 throws IOException {
