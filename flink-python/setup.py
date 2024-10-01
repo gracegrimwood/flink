@@ -341,7 +341,6 @@ try:
         author='Apache Software Foundation',
         author_email='dev@flink.apache.org',
         python_requires='>=3.8',
-        install_requires=install_requires,
         cmdclass={'build_ext': build_ext},
         description='Apache Flink Python API',
         long_description=long_description,

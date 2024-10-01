@@ -41,6 +41,11 @@ function test_all_modules() {
     test_module "table"
 }
 
+unset PYTHONPATH
+echo "$(python -c "import os; import inspect; import py4j; from cloudpickle import cloudpickle; print(os.path.dirname(inspect.getfile(py4j)) + ':' + os.path.dirname(inspect.getfile(cloudpickle)))")"
+export PYTHONPATH="$(dirname "$(python -c 'import site; print(site.getsitepackages())')")"
+echo "PYTHONPATH=${PYTHONPATH}"
+
 # CURRENT_DIR is "flink/flink-python/dev/"
 CURRENT_DIR="$(cd "$( dirname "$0" )" && pwd)"
 

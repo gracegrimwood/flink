@@ -229,6 +229,10 @@ function install_miniconda() {
         $CURRENT_DIR/.conda/bin/python -m pip install --upgrade pip 2>&1 >/dev/null
         print_function "STEP" "upgrade pip... [SUCCESS]"
 
+        print_function "STEP" "installing py4j..."
+        $CURRENT_DIR/.conda/bin/python -m pip install py4j==0.10.9.7 2>&1 >/dev/null
+        print_function "STEP" "install py4j... [SUCCESS]"
+
         if [ $? -ne 0 ]; then
             echo "install miniconda failed"
             exit $CONDA_INSTALL_STATUS
@@ -663,6 +667,7 @@ function flake8_check() {
 
 # Sphinx check
 function sphinx_check() {
+    print_function "STAGE" "sphinx checks"
     export SPHINXBUILD=$SPHINX_PATH
     # cd to $FLINK_PYTHON_DIR
     pushd "$FLINK_PYTHON_DIR"/docs &> /dev/null
