@@ -38,6 +38,7 @@ under the License.
 
 	<properties>
 		<pekko.version>1.1.1</pekko.version>
+		<pekko.netty.version>4.1.113.Final</pekko.netty.version>
 		<scala.binary.version>2.12</scala.binary.version>
 		<scala.version>2.12.16</scala.version>
 	</properties>
@@ -95,7 +96,7 @@ under the License.
 		<dependency>
 			<groupId>io.netty</groupId>
 			<artifactId>netty-all</artifactId>
-			<version>4.1.112.Final</version>
+			<version>${pekko.netty.version}</version>
 			<optional>${flink.markBundledAsOptional}</optional>
 		</dependency>
 
@@ -122,10 +123,6 @@ under the License.
 			<version>${project.version}</version>
 			<scope>test</scope>
 			<type>test-jar</type>
-		</dependency>
-		<dependency>
-			<groupId>io.netty</groupId>
-			<artifactId>netty-common</artifactId>
 		</dependency>
 	</dependencies>
 
@@ -176,6 +173,12 @@ under the License.
 									<include>*</include>
 								</includes>
 							</artifactSet>
+							<relocations>
+								<relocation>
+									<pattern>io.netty</pattern>
+									<shadedPattern>org.apache.flink.pekko.shaded.io.netty</shadedPattern>
+								</relocation>
+							</relocations>
 							<filters>
 								<filter>
 									<artifact>io.netty:netty</artifact>
