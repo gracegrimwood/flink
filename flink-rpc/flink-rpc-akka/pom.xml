@@ -174,8 +174,8 @@ under the License.
 							</artifactSet>
 							<relocations>
 								<relocation>
-									<pattern>org.apache.flink.shaded.netty4.io.netty</pattern>
-									<shadedPattern>io.netty</shadedPattern>
+									<pattern>io.netty</pattern>
+									<shadedPattern>org.apache.flink.shaded.netty4.io.netty</shadedPattern>
 								</relocation>
 							</relocations>
 							<filters>
