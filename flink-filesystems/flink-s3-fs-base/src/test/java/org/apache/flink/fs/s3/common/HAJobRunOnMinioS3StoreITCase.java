@@ -32,13 +32,18 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 
 import org.apache.flink.shaded.guava32.com.google.common.collect.Iterables;
 
-import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import software.amazon.awssdk.core.async.AsyncResponseTransformer;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
+import java.nio.charset.Charset;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.shaded.guava32.com.google.common.base.Predicates.not;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -79,13 +84,17 @@ public abstract class HAJobRunOnMinioS3StoreITCase extends AbstractHAJobRunITCas
         return getMinioContainer().getS3UriForDefaultBucket() + createSubPath(subfolders);
     }
 
-    private static List<S3ObjectSummary> getObjectsFromJobResultStore() {
+    private static List<S3Object> getObjectsFromJobResultStore()
+            throws ExecutionException, InterruptedException {
         return getMinioContainer()
                 .getClient()
                 .listObjects(
-                        getMinioContainer().getDefaultBucketName(),
-                        createSubPath(CLUSTER_ID, JOB_RESULT_STORE_FOLDER))
-                .getObjectSummaries();
+                        ListObjectsRequest.builder()
+                                .bucket(getMinioContainer().getDefaultBucketName())
+                                .prefix(createSubPath(CLUSTER_ID, JOB_RESULT_STORE_FOLDER))
+                                .build())
+                .get()
+                .contents();
     }
 
     private static String createSubPath(String... subfolders) {
@@ -116,29 +125,37 @@ public abstract class HAJobRunOnMinioS3StoreITCase extends AbstractHAJobRunITCas
     protected void runAfterJobTermination() throws Exception {
         CommonTestUtils.waitUntilCondition(
                 () -> {
-                    final List<S3ObjectSummary> objects = getObjectsFromJobResultStore();
+                    final List<S3Object> objects = getObjectsFromJobResultStore();
                     return objects.stream()
-                                    .map(S3ObjectSummary::getKey)
+                                    .map(S3Object::key)
                                     .anyMatch(
                                             FileSystemJobResultStore
                                                     ::hasValidJobResultStoreEntryExtension)
                             && objects.stream()
-                                    .map(S3ObjectSummary::getKey)
+                                    .map(S3Object::key)
                                     .noneMatch(
                                             FileSystemJobResultStore
                                                     ::hasValidDirtyJobResultStoreEntryExtension);
                 },
                 2000L);
 
-        final S3ObjectSummary objRef = Iterables.getOnlyElement(getObjectsFromJobResultStore());
-        assertThat(objRef.getKey())
+        final S3Object objRef = Iterables.getOnlyElement(getObjectsFromJobResultStore());
+        assertThat(objRef.key())
                 .matches(FileSystemJobResultStore::hasValidJobResultStoreEntryExtension)
                 .matches(not(FileSystemJobResultStore::hasValidDirtyJobResultStoreEntryExtension));
 
         final String objContent =
                 getMinioContainer()
                         .getClient()
-                        .getObjectAsString(objRef.getBucketName(), objRef.getKey());
+                        .getObject(
+                                GetObjectRequest.builder()
+                                        .bucket(getMinioContainer().getDefaultBucketName())
+                                        .key(objRef.key())
+                                        .build(),
+                                AsyncResponseTransformer.toBytes())
+                        .get()
+                        .asString(Charset.defaultCharset());
+
         assertThat(objContent).contains(ApplicationStatus.SUCCEEDED.name());
     }
 }

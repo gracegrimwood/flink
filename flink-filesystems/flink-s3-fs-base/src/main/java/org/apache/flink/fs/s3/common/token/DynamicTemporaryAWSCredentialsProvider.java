@@ -20,13 +20,13 @@ package org.apache.flink.fs.s3.common.token;
 
 import org.apache.flink.annotation.Internal;
 
+import org.apache.hadoop.conf.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.services.sts.model.Credentials;
-import org.apache.hadoop.conf.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 
@@ -52,7 +52,7 @@ public class DynamicTemporaryAWSCredentialsProvider implements AwsCredentialsPro
 
     @Override
     public AwsCredentials resolveCredentials() {
-            Credentials credentials = AbstractS3DelegationTokenReceiver.getCredentials();
+        Credentials credentials = AbstractS3DelegationTokenReceiver.getCredentials();
 
         if (credentials == null) {
             throw new RuntimeException(COMPONENT);

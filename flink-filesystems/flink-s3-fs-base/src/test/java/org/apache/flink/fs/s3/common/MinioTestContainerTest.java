@@ -22,14 +22,23 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.EachCallbackWrapper;
 import org.apache.flink.core.testutils.TestContainerExtension;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.Bucket;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.core.async.AsyncResponseTransformer;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.model.Bucket;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -53,36 +62,95 @@ class MinioTestContainerTest {
         return MINIO_EXTENSION.getCustomExtension().getTestContainer();
     }
 
-    private static AmazonS3 getClient() {
+    private static S3AsyncClient getClient() {
         return getTestContainer().getClient();
     }
 
+    private static Bucket createBucket(String bucketName) {
+        try {
+            return getClient()
+                    .createBucket(CreateBucketRequest.builder().bucket(bucketName).build())
+                    .whenComplete(
+                            (response, throwable) -> {
+                                if (throwable != null) {
+                                    throw new RuntimeException(
+                                            String.format(
+                                                    "Bucket '%s' creation failed", bucketName),
+                                            throwable);
+                                }
+                            })
+                    .thenCompose(
+                            createBucketResponse ->
+                                    getClient()
+                                            .waiter()
+                                            .waitUntilBucketExists(
+                                                    HeadBucketRequest.builder()
+                                                            .bucket(bucketName)
+                                                            .build()))
+                    .thenCompose(
+                            waitForBucketResponse -> {
+                                return CompletableFuture.supplyAsync(
+                                        () -> {
+                                            for (Bucket bucket : listBuckets()) {
+                                                if (bucket.name().equals(bucketName)) {
+                                                    return bucket;
+                                                }
+                                            }
+                                            throw new RuntimeException(
+                                                    String.format(
+                                                            "Bucket '%s' not found", bucketName));
+                                        });
+                            })
+                    .get();
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
+
+    private static List<Bucket> listBuckets() {
+        try {
+            return getClient().listBuckets().get().buckets();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Test
-    void testBucketCreation() {
+    void testBucketCreation() throws ExecutionException, InterruptedException {
         final String bucketName = "other-bucket";
-        final Bucket otherBucket = getClient().createBucket(bucketName);
+        final Bucket otherBucket = createBucket(bucketName);
 
         assertThat(otherBucket).isNotNull();
-        assertThat(otherBucket).extracting(Bucket::getName).isEqualTo(bucketName);
+        assertThat(otherBucket).extracting(Bucket::name).isEqualTo(bucketName);
 
-        assertThat(getClient().listBuckets())
-                .map(Bucket::getName)
+        assertThat(listBuckets())
+                .map(Bucket::name)
                 .containsExactlyInAnyOrder(getTestContainer().getDefaultBucketName(), bucketName);
     }
 
     @Test
-    void testPutObject() throws IOException {
+    void testPutObject() throws IOException, ExecutionException, InterruptedException {
         final String bucketName = "other-bucket";
 
-        getClient().createBucket(bucketName);
+        createBucket(bucketName);
         final String objectId = "test-object";
         final String content = "test content";
-        getClient().putObject(bucketName, objectId, content);
+        getClient()
+                .putObject(
+                        PutObjectRequest.builder().bucket(bucketName).key(objectId).build(),
+                        AsyncRequestBody.fromString(content));
 
         final BufferedReader reader =
                 new BufferedReader(
                         new InputStreamReader(
-                                getClient().getObject(bucketName, objectId).getObjectContent()));
+                                getClient()
+                                        .getObject(
+                                                GetObjectRequest.builder()
+                                                        .bucket(bucketName)
+                                                        .key(objectId)
+                                                        .build(),
+                                                AsyncResponseTransformer.toBlockingInputStream())
+                                        .get()));
         assertThat(reader.readLine()).isEqualTo(content);
     }
 
@@ -104,9 +172,9 @@ class MinioTestContainerTest {
 
     @Test
     void testDefaultBucketCreation() {
-        assertThat(getClient().listBuckets())
+        assertThat(listBuckets())
                 .singleElement()
-                .extracting(Bucket::getName)
+                .extracting(Bucket::name)
                 .isEqualTo(getTestContainer().getDefaultBucketName());
     }
 

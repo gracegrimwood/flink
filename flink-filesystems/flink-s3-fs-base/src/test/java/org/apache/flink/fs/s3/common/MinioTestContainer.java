@@ -23,19 +23,20 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.util.DockerImageVersions;
 import org.apache.flink.util.Preconditions;
 
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
 import org.testcontainers.utility.Base58;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.Locale;
 
@@ -77,7 +78,7 @@ class MinioTestContainer extends GenericContainer<MinioTestContainer> {
                         .forPath(HEALTH_ENDPOINT)
                         .withStartupTimeout(Duration.ofMinutes(2)));
         // Very rarely, a 503 status will be returned continuously while the container is
-        // starting up, slipping past the AmazonS3 client's default retry strategy.
+        // starting up, slipping past the S3AsyncClient's default retry strategy.
         withStartupAttempts(3);
     }
 
@@ -91,17 +92,23 @@ class MinioTestContainer extends GenericContainer<MinioTestContainer> {
         return String.format("%s-%s", prefix, Base58.randomString(length).toLowerCase(Locale.ROOT));
     }
 
-    /** Creates {@link AmazonS3} client for accessing the {@code Minio} instance. */
-    public AmazonS3 getClient() {
-        return AmazonS3Client.builder()
-                .withCredentials(
-                        new AWSStaticCredentialsProvider(
-                                new BasicAWSCredentials(accessKey, secretKey)))
-                .withPathStyleAccessEnabled(true)
-                .withEndpointConfiguration(
-                        new AwsClientBuilder.EndpointConfiguration(
-                                getHttpEndpoint(), "unused-region"))
-                .build();
+    /** Creates {@link S3AsyncClient} client for accessing the {@code Minio} instance. */
+    public S3AsyncClient getClient() {
+        String endpoint = getHttpEndpoint();
+        try {
+            return S3AsyncClient.builder()
+                    .credentialsProvider(
+                            StaticCredentialsProvider.create(
+                                    AwsBasicCredentials.create(accessKey, secretKey)))
+                    .forcePathStyle(true)
+                    .endpointOverride(new URI(endpoint))
+                    .build();
+        } catch (URISyntaxException ex) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Invalid endpoint string '%s' could not be converted to URI", endpoint),
+                    ex);
+        }
     }
 
     private String getHttpEndpoint() {
@@ -129,7 +136,7 @@ class MinioTestContainer extends GenericContainer<MinioTestContainer> {
     }
 
     private void createDefaultBucket() {
-        getClient().createBucket(defaultBucketName);
+        getClient().createBucket(CreateBucketRequest.builder().bucket(defaultBucketName).build());
     }
 
     /** Returns the internally used default bucket. */
