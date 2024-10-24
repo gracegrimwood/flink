@@ -23,19 +23,13 @@ import org.apache.flink.core.fs.RefCountedFileWithStream;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.MathUtils;
 
-import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectResult;
-import com.amazonaws.services.s3.model.UploadPartResult;
+import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
+import software.amazon.awssdk.services.s3control.model.S3ObjectMetadata;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.hamcrest.Description;
-import org.hamcrest.TypeSafeMatcher;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import software.amazon.awssdk.services.s3.model.Part;
 
 import java.io.File;
@@ -149,14 +143,14 @@ class RecoverableMultiPartUploadImplTest {
 
     private static void assertThatHasMultiPartUploadWithPart(
             StubMultiPartUploader actual, byte[] content, int partNo) {
-        TestUploadPartResult expectedCompletePart =
+        TestUploadPartResponse expectedCompletePart =
                 createUploadPartResult(TEST_OBJECT_NAME, partNo, content);
 
         assertThat(actual.getCompletePartsUploaded()).contains(expectedCompletePart);
     }
 
     private static void assertThatHasUploadedObject(StubMultiPartUploader actual, byte[] content) {
-        TestPutObjectResult expectedIncompletePart =
+        TestPutObjectResponse expectedIncompletePart =
                 createPutObjectResult(TEST_OBJECT_NAME, content);
 
         assertThat(actual.getIncompletePartsUploaded()).contains(expectedIncompletePart);
@@ -209,16 +203,16 @@ class RecoverableMultiPartUploadImplTest {
                 (long) incompletePart.length);
     }
 
-    private static RecoverableMultiPartUploadImplTest.TestPutObjectResult createPutObjectResult(
+    private static TestPutObjectResponse createPutObjectResult(
             String key, byte[] content) {
-        final RecoverableMultiPartUploadImplTest.TestPutObjectResult result =
-                new RecoverableMultiPartUploadImplTest.TestPutObjectResult();
+        final TestPutObjectResponse result =
+                new TestPutObjectResponse();
         result.setETag(createETag(key, -1));
         result.setContent(content);
         return result;
     }
 
-    private static RecoverableMultiPartUploadImplTest.TestUploadPartResult createUploadPartResult(
+    private static TestUploadPartResponse createUploadPartResult(
             String key, int number, byte[] payload) {
         final RecoverableMultiPartUploadImplTest.TestUploadPartResult result =
                 new RecoverableMultiPartUploadImplTest.TestUploadPartResult();
@@ -288,16 +282,16 @@ class RecoverableMultiPartUploadImplTest {
      */
     private static class StubMultiPartUploader implements S3AccessHelper {
 
-        private final List<RecoverableMultiPartUploadImplTest.TestUploadPartResult>
+        private final List<UploadPartResponse>
                 completePartsUploaded = new ArrayList<>();
-        private final List<RecoverableMultiPartUploadImplTest.TestPutObjectResult>
+        private final List<TestPutObjectResponse>
                 incompletePartsUploaded = new ArrayList<>();
 
-        List<RecoverableMultiPartUploadImplTest.TestUploadPartResult> getCompletePartsUploaded() {
+        List<UploadPartResponse> getCompletePartsUploaded() {
             return completePartsUploaded;
         }
 
-        List<RecoverableMultiPartUploadImplTest.TestPutObjectResult> getIncompletePartsUploaded() {
+        List<TestPutObjectResponse> getIncompletePartsUploaded() {
             return incompletePartsUploaded;
         }
 
@@ -307,7 +301,7 @@ class RecoverableMultiPartUploadImplTest {
         }
 
         @Override
-        public UploadPartResult uploadPart(
+        public UploadPartResponse uploadPart(
                 String key, String uploadId, int partNumber, File inputFile, long length)
                 throws IOException {
             final byte[] content =
@@ -316,7 +310,7 @@ class RecoverableMultiPartUploadImplTest {
         }
 
         @Override
-        public PutObjectResult putObject(String key, File inputFile) throws IOException {
+        public PutObjectResponse putObject(String key, File inputFile) throws IOException {
             final byte[] content =
                     getFileContentBytes(inputFile, MathUtils.checkedDownCast(inputFile.length()));
             return storeAndGetPutObjectResult(key, content);
@@ -333,7 +327,7 @@ class RecoverableMultiPartUploadImplTest {
         }
 
         @Override
-        public CompleteMultipartUploadResult commitMultiPartUpload(
+        public CompleteMultipartUploadResponse commitMultiPartUpload(
                 String key,
                 String uploadId,
                 List<Part> partETags,
@@ -344,7 +338,7 @@ class RecoverableMultiPartUploadImplTest {
         }
 
         @Override
-        public ObjectMetadata getObjectMetadata(String key) throws IOException {
+        public S3ObjectMetadata getObjectMetadata(String key) throws IOException {
             throw new UnsupportedOperationException();
         }
 
@@ -354,25 +348,25 @@ class RecoverableMultiPartUploadImplTest {
             return content;
         }
 
-        private RecoverableMultiPartUploadImplTest.TestUploadPartResult storeAndGetUploadPartResult(
+        private TestUploadPartResponse storeAndGetUploadPartResult(
                 String key, int number, byte[] payload) {
-            final RecoverableMultiPartUploadImplTest.TestUploadPartResult result =
+            final TestUploadPartResponse result =
                     createUploadPartResult(key, number, payload);
             completePartsUploaded.add(result);
             return result;
         }
 
-        private RecoverableMultiPartUploadImplTest.TestPutObjectResult storeAndGetPutObjectResult(
+        private TestPutObjectResponse storeAndGetPutObjectResult(
                 String key, byte[] payload) {
-            final RecoverableMultiPartUploadImplTest.TestPutObjectResult result =
+            final TestPutObjectResponse result =
                     createPutObjectResult(key, payload);
             incompletePartsUploaded.add(result);
             return result;
         }
     }
 
-    /** A {@link PutObjectResult} that also contains the actual content of the uploaded part. */
-    private static class TestPutObjectResult extends PutObjectResult {
+    /** A {@link PutObjectResponse} that also contains the actual content of the uploaded part. */
+    private static class TestPutObjectResponse extends PutObjectResponse {
         private static final long serialVersionUID = 1L;
 
         private byte[] content;
@@ -394,7 +388,7 @@ class RecoverableMultiPartUploadImplTest {
                 return false;
             }
 
-            final TestPutObjectResult that = (TestPutObjectResult) o;
+            final TestPutObjectResponse that = (TestPutObjectResponse) o;
             // we ignore the etag as it contains randomness
             return Arrays.equals(getContent(), that.getContent());
         }
@@ -406,12 +400,12 @@ class RecoverableMultiPartUploadImplTest {
 
         @Override
         public String toString() {
-            return '{' + " eTag=" + getETag() + ", payload=" + Arrays.toString(content) + '}';
+            return '{' + " eTag=" + eTag() + ", payload=" + Arrays.toString(content) + '}';
         }
     }
 
-    /** A {@link UploadPartResult} that also contains the actual content of the uploaded part. */
-    private static class TestUploadPartResult extends UploadPartResult {
+    /** A {@link UploadPartResponse} that also contains the actual content of the uploaded part. */
+    private static class TestUploadPartResponse extends UploadPartResponse {
 
         private static final long serialVersionUID = 1L;
 
@@ -434,22 +428,22 @@ class RecoverableMultiPartUploadImplTest {
                 return false;
             }
 
-            final TestUploadPartResult that = (TestUploadPartResult) o;
-            return getETag().equals(that.getETag())
+            final TestUploadPartResponse that = (TestUploadPartResponse) o;
+            return eTag().equals(that.eTag())
                     && getPartNumber() == that.getPartNumber()
                     && Arrays.equals(content, that.content);
         }
 
         @Override
         public int hashCode() {
-            return 31 * Objects.hash(getETag(), getPartNumber()) + Arrays.hashCode(getContent());
+            return 31 * Objects.hash(eTag(), getPartNumber()) + Arrays.hashCode(getContent());
         }
 
         @Override
         public String toString() {
             return '{'
                     + "etag="
-                    + getETag()
+                    + eTag()
                     + ", partNo="
                     + getPartNumber()
                     + ", content="
