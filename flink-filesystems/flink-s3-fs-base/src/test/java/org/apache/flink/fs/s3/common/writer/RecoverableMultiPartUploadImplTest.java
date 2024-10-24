@@ -23,14 +23,14 @@ import org.apache.flink.core.fs.RefCountedFileWithStream;
 import org.apache.flink.util.IOUtils;
 import org.apache.flink.util.MathUtils;
 
-import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
-import software.amazon.awssdk.services.s3control.model.S3ObjectMetadata;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
-import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.Part;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.UploadPartResponse;
+import software.amazon.awssdk.services.s3control.model.S3ObjectMetadata;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -203,10 +203,8 @@ class RecoverableMultiPartUploadImplTest {
                 (long) incompletePart.length);
     }
 
-    private static TestPutObjectResponse createPutObjectResult(
-            String key, byte[] content) {
-        final TestPutObjectResponse result =
-                new TestPutObjectResponse();
+    private static TestPutObjectResponse createPutObjectResult(String key, byte[] content) {
+        final TestPutObjectResponse result = new TestPutObjectResponse();
         result.setETag(createETag(key, -1));
         result.setContent(content);
         return result;
@@ -282,10 +280,8 @@ class RecoverableMultiPartUploadImplTest {
      */
     private static class StubMultiPartUploader implements S3AccessHelper {
 
-        private final List<UploadPartResponse>
-                completePartsUploaded = new ArrayList<>();
-        private final List<TestPutObjectResponse>
-                incompletePartsUploaded = new ArrayList<>();
+        private final List<UploadPartResponse> completePartsUploaded = new ArrayList<>();
+        private final List<TestPutObjectResponse> incompletePartsUploaded = new ArrayList<>();
 
         List<UploadPartResponse> getCompletePartsUploaded() {
             return completePartsUploaded;
@@ -350,16 +346,13 @@ class RecoverableMultiPartUploadImplTest {
 
         private TestUploadPartResponse storeAndGetUploadPartResult(
                 String key, int number, byte[] payload) {
-            final TestUploadPartResponse result =
-                    createUploadPartResult(key, number, payload);
+            final TestUploadPartResponse result = createUploadPartResult(key, number, payload);
             completePartsUploaded.add(result);
             return result;
         }
 
-        private TestPutObjectResponse storeAndGetPutObjectResult(
-                String key, byte[] payload) {
-            final TestPutObjectResponse result =
-                    createPutObjectResult(key, payload);
+        private TestPutObjectResponse storeAndGetPutObjectResult(String key, byte[] payload) {
+            final TestPutObjectResponse result = createPutObjectResult(key, payload);
             incompletePartsUploaded.add(result);
             return result;
         }
