@@ -40,9 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -143,15 +141,14 @@ class RecoverableMultiPartUploadImplTest {
 
     private static void assertThatHasMultiPartUploadWithPart(
             StubMultiPartUploader actual, byte[] content, int partNo) {
-        TestUploadPartResponse expectedCompletePart =
+        UploadPartResponse expectedCompletePart =
                 createUploadPartResult(TEST_OBJECT_NAME, partNo, content);
 
         assertThat(actual.getCompletePartsUploaded()).contains(expectedCompletePart);
     }
 
     private static void assertThatHasUploadedObject(StubMultiPartUploader actual, byte[] content) {
-        TestPutObjectResponse expectedIncompletePart =
-                createPutObjectResult(TEST_OBJECT_NAME, content);
+        PutObjectResponse expectedIncompletePart = createPutObjectResult(TEST_OBJECT_NAME, content);
 
         assertThat(actual.getIncompletePartsUploaded()).contains(expectedIncompletePart);
     }
@@ -203,20 +200,20 @@ class RecoverableMultiPartUploadImplTest {
                 (long) incompletePart.length);
     }
 
-    private static TestPutObjectResponse createPutObjectResult(String key, byte[] content) {
-        final TestPutObjectResponse result = new TestPutObjectResponse();
-        result.setETag(createETag(key, -1));
-        result.setContent(content);
+    private static PutObjectResponse createPutObjectResult(String key, byte[] content) {
+        final PutObjectResponse result = PutObjectResponse.builder().build();
+        Class<?> innerClass = PutObjectResponse.class.getDeclaredClasses()[0];
+        //        result.setETag(createETag(key, -1));
+        //        result.setContent(content);
         return result;
     }
 
-    private static TestUploadPartResponse createUploadPartResult(
+    private static UploadPartResponse createUploadPartResult(
             String key, int number, byte[] payload) {
-        final RecoverableMultiPartUploadImplTest.TestUploadPartResult result =
-                new RecoverableMultiPartUploadImplTest.TestUploadPartResult();
-        result.setETag(createETag(key, number));
-        result.setPartNumber(number);
-        result.setContent(payload);
+        final UploadPartResponse result = UploadPartResponse.builder().build();
+        //        result.setETag(createETag(key, number));
+        //        result.setPartNumber(number);
+        //        result.setContent(payload);
         return result;
     }
 
@@ -281,13 +278,13 @@ class RecoverableMultiPartUploadImplTest {
     private static class StubMultiPartUploader implements S3AccessHelper {
 
         private final List<UploadPartResponse> completePartsUploaded = new ArrayList<>();
-        private final List<TestPutObjectResponse> incompletePartsUploaded = new ArrayList<>();
+        private final List<PutObjectResponse> incompletePartsUploaded = new ArrayList<>();
 
         List<UploadPartResponse> getCompletePartsUploaded() {
             return completePartsUploaded;
         }
 
-        List<TestPutObjectResponse> getIncompletePartsUploaded() {
+        List<PutObjectResponse> getIncompletePartsUploaded() {
             return incompletePartsUploaded;
         }
 
@@ -344,104 +341,17 @@ class RecoverableMultiPartUploadImplTest {
             return content;
         }
 
-        private TestUploadPartResponse storeAndGetUploadPartResult(
+        private UploadPartResponse storeAndGetUploadPartResult(
                 String key, int number, byte[] payload) {
-            final TestUploadPartResponse result = createUploadPartResult(key, number, payload);
+            final UploadPartResponse result = createUploadPartResult(key, number, payload);
             completePartsUploaded.add(result);
             return result;
         }
 
-        private TestPutObjectResponse storeAndGetPutObjectResult(String key, byte[] payload) {
-            final TestPutObjectResponse result = createPutObjectResult(key, payload);
+        private PutObjectResponse storeAndGetPutObjectResult(String key, byte[] payload) {
+            final PutObjectResponse result = createPutObjectResult(key, payload);
             incompletePartsUploaded.add(result);
             return result;
-        }
-    }
-
-    /** A {@link PutObjectResponse} that also contains the actual content of the uploaded part. */
-    private static class TestPutObjectResponse extends PutObjectResponse {
-        private static final long serialVersionUID = 1L;
-
-        private byte[] content;
-
-        void setContent(byte[] payload) {
-            this.content = payload;
-        }
-
-        public byte[] getContent() {
-            return content;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
-            final TestPutObjectResponse that = (TestPutObjectResponse) o;
-            // we ignore the etag as it contains randomness
-            return Arrays.equals(getContent(), that.getContent());
-        }
-
-        @Override
-        public int hashCode() {
-            return Arrays.hashCode(getContent());
-        }
-
-        @Override
-        public String toString() {
-            return '{' + " eTag=" + eTag() + ", payload=" + Arrays.toString(content) + '}';
-        }
-    }
-
-    /** A {@link UploadPartResponse} that also contains the actual content of the uploaded part. */
-    private static class TestUploadPartResponse extends UploadPartResponse {
-
-        private static final long serialVersionUID = 1L;
-
-        private byte[] content;
-
-        void setContent(byte[] content) {
-            this.content = content;
-        }
-
-        public byte[] getContent() {
-            return content;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
-            final TestUploadPartResponse that = (TestUploadPartResponse) o;
-            return eTag().equals(that.eTag())
-                    && getPartNumber() == that.getPartNumber()
-                    && Arrays.equals(content, that.content);
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * Objects.hash(eTag(), getPartNumber()) + Arrays.hashCode(getContent());
-        }
-
-        @Override
-        public String toString() {
-            return '{'
-                    + "etag="
-                    + eTag()
-                    + ", partNo="
-                    + getPartNumber()
-                    + ", content="
-                    + Arrays.toString(content)
-                    + '}';
         }
     }
 }
