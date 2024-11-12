@@ -33,6 +33,7 @@ under the License.
 	<properties>
 		<fs.s3.aws.version>1.12.319</fs.s3.aws.version>
 		<fs.s3.aws.v2.version>2.20.1</fs.s3.aws.v2.version>
+		<fs.s3.hadoop.version>3.3.4</fs.s3.hadoop.version>
 		<japicmp.skip>true</japicmp.skip>
 		<surefire.module.config> <!--
 			S5CmdOnMinioITCase uses ArraysAsListSerializer indirectly
@@ -74,7 +75,7 @@ under the License.
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-common</artifactId>
-			<version>${fs.hadoopshaded.version}</version>
+			<version>${fs.s3.hadoop.version}</version>
 			<exclusions>
 				<exclusion>
 					<groupId>jdk.tools</groupId>
@@ -241,7 +242,7 @@ under the License.
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-aws</artifactId>
-			<version>${fs.hadoopshaded.version}</version>
+			<version>${fs.s3.hadoop.version}</version>
 			<exclusions>
 				<exclusion>
 					<groupId>ch.qos.reload4j</groupId>
